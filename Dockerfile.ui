@@ -1,16 +1,33 @@
 FROM node:lts-slim AS cvat-ui
 
+# 未使用? 不知道什么意思
 ARG WA_PAGE_VIEW_HIT
+# 默认的入口, 不指定的话在项目中的 webpack.config.js 会有默认值
 ARG UI_APP_CONFIG
+# 客户端插件, 如果没有指定的话在项目中的 webpack.config.js 会有默认值
 ARG CLIENT_PLUGINS
+# 是否生成source map debug, 方便在浏览器debug的时候知道代码出错在源代码的哪一行。
+# 如果是生产环境, 应该设置为 true, 可以减小镜像大小。
 ARG DISABLE_SOURCE_MAPS
+# token一般用于增加标识符, cvat中未使用。
 ARG SOURCE_MAPS_TOKEN
 
+# 使用xterm命令行终端
 ENV TERM=xterm \
     LANG='C.UTF-8'  \
     LC_ALL='C.UTF-8'
 
 # Install dependencies
+# cvat-ui 依赖于cvat-core, cvat-canvas, cvat-data中的package.json
+# 因为cvat项目使用了
+#   "workspaces": [
+#     "cvat-data",
+#     "cvat-core",
+#     "cvat-canvas",
+#     "cvat-canvas3d",
+#     "cvat-ui"
+#   ]
+# 所以需要把该这些依赖的package进行安装
 COPY package.json /tmp/
 COPY yarn.lock /tmp/
 COPY cvat-core/package.json /tmp/cvat-core/
@@ -20,15 +37,23 @@ COPY cvat-ui/package.json /tmp/cvat-ui/
 COPY cvat-data/package.json /tmp/cvat-data/
 
 # Install common dependencies
+# 进入到package.json目录，然后使用yarn安装依赖包
 WORKDIR /tmp/
 RUN DISABLE_HUSKY=1 yarn --frozen-lockfile
 
 # Build source code
+# 先将源码复制到给定目录, 会覆盖之前的package.json，但不影响结果
 COPY cvat-data/ /tmp/cvat-data/
 COPY cvat-core/ /tmp/cvat-core/
 COPY cvat-canvas3d/ /tmp/cvat-canvas3d/
 COPY cvat-canvas/ /tmp/cvat-canvas/
 COPY cvat-ui/ /tmp/cvat-ui/
+# 进行编译构建
+# 实际上命令: yarn run build:cvat-ui --->
+#           yarn workspace cvat-ui run build --->
+#           webpack --config ./webpack.config.js
+# 生产环境应该将 DISABLE_SOURCE_MAPS 设置为 true, 例如(在此项目目录下构建docker image):
+# docker build --build-arg DISABLE_SOURCE_MAPS=true  -f Dockerfile.ui .
 RUN CLIENT_PLUGINS="${CLIENT_PLUGINS}" \
 DISABLE_SOURCE_MAPS="${DISABLE_SOURCE_MAPS}" \
 UI_APP_CONFIG="${UI_APP_CONFIG}" \
@@ -36,5 +61,7 @@ SOURCE_MAPS_TOKEN="${SOURCE_MAPS_TOKEN}" yarn run build:cvat-ui
 
 FROM nginx:mainline-alpine
 # Replace default.conf configuration to remove unnecessary rules
+# 当cvat-ui构建完成之后, 将构建的结构复制到实际运行的容器中
+# cvat-ui 自定义了 nginx 反向代理的一些配置, 然后直接将构建目录的 /tmp/cvat-ui/dist 复制到nginx
 COPY cvat-ui/react_nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=cvat-ui /tmp/cvat-ui/dist /usr/share/nginx/html/
