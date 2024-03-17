@@ -2,16 +2,37 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { omit, throttle } from 'lodash';
-import { ArgumentError } from './exceptions';
-import { SerializedCollection } from './server-response-types';
+/**
+ * omit的用法如下:
+ * ```javascript
+ * const person = { name: 'John', age: 30, city: 'New York' };
+ * const keysToOmit = ['age', 'city'];
+ * const result = omit(person, keysToOmit);
+ * console.log(result); // 输出: { name: 'John' }
+ * ```
+ * throttle的用法如下:
+ * ```javascript
+ * function heavyTask() {
+ *   console.log('Heavy task is running');
+ * }
+ * const throttledTask = throttle(heavyTask, 1000); // 限制 heavyTask 函数每秒最多执行一次
+ * ```
+ */
+import { omit, throttle } from 'lodash'; // omit 用于过滤
+import { ArgumentError } from './exceptions'; // 使用自定义的参数错误异常
+import { SerializedCollection } from './server-response-types'; // 这里结合omit获得一个 SerializedShape 的集合
 import { Job, Task } from './session';
 import { LogType, ObjectType } from './enums';
 import ObjectState from './object-state';
 import { getAnnotations, getCollection } from './annotations';
 
+/**
+ * 对单一 Frame 操作的Action输入定义
+ */
 export interface SingleFrameActionInput {
+    // 使用omit过滤, 只留下 SerializedShape, 这是一个集合, 包含了所有被操作的 Annotation Shape
     collection: Omit<SerializedCollection, 'tracks' | 'tags' | 'version'>;
+    // 指明这个 Action 是针对哪一个 frame 的
     frameData: {
         width: number;
         height: number;
@@ -19,21 +40,34 @@ export interface SingleFrameActionInput {
     };
 }
 
+/**
+ * 对单一 Frame 操作的输出定义, 可以看到, 输入和输出都是一个 SerializedShape 的集合
+ */
 export interface SingleFrameActionOutput {
     collection: Omit<SerializedCollection, 'tracks' | 'tags' | 'version'>;
 }
 
+/**
+ * Action参数类型
+ */
 export enum ActionParameterType {
     SELECT = 'select',
     NUMBER = 'number',
 }
 
+/**
+ * 一个Action 的参数是一个 Record<string, Type>
+ * 一个Action会有多个参数，对应多个具体的Shape操作
+ */
 type ActionParameters = Record<string, {
     type: ActionParameterType;
     values: string[];
     defaultValue: string;
 }>;
-
+/**
+ * 封装的，对单个Frame操作的Action，的基类。
+ * 包括 初始化, 运行, 结束，设置了两个get方法来获得Action 名称和参数。
+ */
 export default class BaseSingleFrameAction {
     /* eslint-disable @typescript-eslint/no-unused-vars */
     public async init(
@@ -60,6 +94,9 @@ export default class BaseSingleFrameAction {
     }
 }
 
+/**
+ * 移除掉已经过滤的Shape，不需要参数，一开始是空集合。
+ */
 class RemoveFilteredShapes extends BaseSingleFrameAction {
     public async init(): Promise<void> {
         // nothing to init
@@ -82,12 +119,22 @@ class RemoveFilteredShapes extends BaseSingleFrameAction {
     }
 }
 
+/**
+ * 已注册的 Action
+ */
 const registeredActions: BaseSingleFrameAction[] = [];
 
+/**
+ * 列出所有已注册的Action
+ */
 export async function listActions(): Promise<BaseSingleFrameAction[]> {
     return [...registeredActions];
 }
 
+/**
+ * 注册一个Action
+ * @param action 待注册的Action, 必须保证是BaseSingleFrameAction类型并且名称是没有被注册过的
+ */
 export async function registerAction(action: BaseSingleFrameAction): Promise<void> {
     if (!(action instanceof BaseSingleFrameAction)) {
         throw new ArgumentError('Provided action is not instance of BaseSingleFrameAction');
@@ -101,8 +148,22 @@ export async function registerAction(action: BaseSingleFrameAction): Promise<voi
     registeredActions.push(action);
 }
 
+/**
+ * 先注册一个 过滤掉的 Shapes
+ */
 registerAction(new RemoveFilteredShapes());
 
+/**
+ * 链式运行一个对单一 Frame 的操作的 actions
+ * @param instance  frame属于哪个实例, Job 或者 Task
+ * @param actionsChain  待执行的所有 action
+ * @param actionParameters  action的参数
+ * @param frameFrom 开始的frame id
+ * @param frameTo   结束的frame id
+ * @param filters   过滤器, 过滤一些不需要处理的 frame
+ * @param onProgress    正在运行的Action
+ * @param cancelled 某个Action是否被取消
+ */
 async function runSingleFrameChain(
     instance: Job | Task,
     actionsChain: BaseSingleFrameAction[],
@@ -114,6 +175,7 @@ async function runSingleFrameChain(
     cancelled: () => boolean,
 ): Promise<void> {
     type IDsToHandle = { shapes: number[] };
+    // 记录操作记录, 记录frame起始id和所有待执行的action名称
     const event = await instance.logger.log(LogType.annotationsAction, {
         from: frameFrom,
         to: frameTo,
@@ -229,6 +291,17 @@ async function runSingleFrameChain(
     }
 }
 
+/**
+ * 运行 actions 的接口, 调用异步函数 runSingleFrameChain 实现 。
+ * @param instance  frame属于哪个实例, Job 或者 Task
+ * @param actionsChain  待执行的所有 action
+ * @param actionParameters  action的参数
+ * @param frameFrom 开始的frame id
+ * @param frameTo   结束的frame id
+ * @param filters   过滤器, 过滤一些不需要处理的 frame
+ * @param onProgress    正在运行的Action
+ * @param cancelled 某个Action是否被取消
+ */
 export async function runActions(
     instance: Job | Task,
     actionsChain: BaseSingleFrameAction[],
