@@ -6,14 +6,17 @@
 import Platform from 'platform';
 import ErrorStackParser from 'error-stack-parser';
 
+/**
+ *  定义了cvat中的异常基类，添加了一些额外信息。
+ */
 export class Exception extends Error {
-    private readonly time: string;
-    private readonly system: string;
-    private readonly client: string;
-    private readonly info: string;
-    private readonly filename: string;
-    private readonly line: number;
-    private readonly column: number;
+    private readonly time: string; // 异常触发的时间
+    private readonly system: string; // 操作系统名称
+    private readonly client: string; // 浏览器名称 + 版本
+    private readonly info: string; // 错误调用栈
+    private readonly filename: string; // 文件名
+    private readonly line: number; // 行号
+    private readonly column: number; // 列号
 
     constructor(message) {
         super(message);
@@ -93,14 +96,30 @@ export class Exception extends Error {
     }
 }
 
-export class ArgumentError extends Exception {}
+/**
+ * 参数错误
+ */
+export class ArgumentError extends Exception {
+}
 
-export class DataError extends Exception {}
+/**
+ * 数据错误
+ */
+export class DataError extends Exception {
+}
 
-export class ScriptingError extends Exception {}
+/**
+ * 脚本错误
+ */
+export class ScriptingError extends Exception {
+}
 
+/**
+ * 服务器错误
+ */
 export class ServerError extends Exception {
-    public code: number;
+    public code: number; // 错误码
+
     constructor(message, code) {
         super(message);
 

@@ -2,6 +2,7 @@
 // Copyright (C) 2022-2023 CVAT.ai Corporation
 //
 // SPDX-License-Identifier = MIT
+// 定义标注相关的一些状态、类型、模式、历史操作记录和任务阶段等。
 
 export enum ShareFileType {
     DIR = 'DIR',

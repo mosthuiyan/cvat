@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import {
+import { // 导入自定义的枚举类型，进而定义 “服务器响应类型”
     ChunkType,
     DimensionType, JobStage, JobState, JobType, ProjectStatus,
     ShapeType, StorageLocation, LabelType,
