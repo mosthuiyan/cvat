@@ -23,6 +23,12 @@ import {
 
 const defaultGroupColor = '#E0E0E0';
 
+/**
+ * 用于复制 TrackedShape, 主要复制 state, 同时可以用 data 覆盖 state的值。
+ * TrackedShape只用于跟踪模式的标注。
+ * @param state 基础对象
+ * @param data  额外的对象
+ */
 function copyShape(state: TrackedShape, data: Partial<TrackedShape> = {}): TrackedShape {
     return {
         rotation: state.rotation,
@@ -35,6 +41,10 @@ function copyShape(state: TrackedShape, data: Partial<TrackedShape> = {}): Track
     };
 }
 
+/**
+ * 判断是手动标注还是半自动标注, AUTO 和 SEMI_AUTO 都被视为 SEMI_AUTO
+ * @param currentSource 当前的annotation来源
+ */
 function computeNewSource(currentSource: Source): Source {
     if ([Source.AUTO, Source.SEMI_AUTO].includes(currentSource)) {
         return Source.SEMI_AUTO;
@@ -43,6 +53,9 @@ function computeNewSource(currentSource: Source): Source {
     return Source.MANUAL;
 }
 
+/**
+ * 用于构造 {@link Annotation} 的参数, 用一个接口描述应该传递的参数, 可以避免构造函数写的太长。
+ */
 export interface BasicInjection {
     labels: Record<number, Label>;
     groups: { max: number };
@@ -59,11 +72,18 @@ export interface BasicInjection {
     getMasksOnFrame: (frame: number) => MaskShape[];
 }
 
+/**
+ * 感觉没有意义,因为BasicInjection也定义成了可选, 如果是为了分开可选和必须的字段,
+ * 那么分开来写可以将BasicInjection中的所有字段都定义成可选的。
+ */
 type AnnotationInjection = BasicInjection & {
     parentID?: number;
     readOnlyFields?: string[];
 };
 
+/**
+ * 所有标签的基类, 主要标识了这个annotation的状态和归属。
+ */
 class Annotation {
     public clientID: number;
     protected taskLabels: Record<number, Label>;
@@ -383,6 +403,9 @@ class Annotation {
     }
 }
 
+/**
+ * 绘制标签的状态, 比如, hidden, pinned
+ */
 class Drawn extends Annotation {
     protected frameMeta: AnnotationInjection['frameMeta'];
     protected descriptions: string[];
@@ -494,11 +517,18 @@ class Drawn extends Annotation {
     }
 }
 
+/**
+ * 2D 标注中标签的基类, 所有的标签都会继承这个 Shape。
+ */
 export class Shape extends Drawn {
+    // 所有 Shape都以点表示
     public points: number[];
+    // 该shape是否被遮挡
     public occluded: boolean;
     public outside: boolean;
+    // 该shape的旋转角度
     public rotation: number;
+    // 该shape图层概念上的Z值
     public zOrder: number;
 
     constructor(
@@ -810,6 +840,7 @@ export interface InterpolatedPosition {
 
 export class Track extends Drawn {
     public shapes: Record<number, TrackedShape>;
+
     constructor(
         data: SerializedTrack | SerializedTrack['elements'][0],
         clientID: number,
@@ -1393,7 +1424,7 @@ export class Track extends Drawn {
 
         throw new DataError(
             'No one left position or right position was found. ' +
-                `Interpolation impossible. Client ID: ${this.clientID}`,
+            `Interpolation impossible. Client ID: ${this.clientID}`,
         );
     }
 }
@@ -1676,7 +1707,7 @@ export class PolylineShape extends PolyShape {
                 // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
                 distances.push(
                     Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) /
-                        Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2),
+                    Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2),
                 );
             } else {
                 // The link below works for lines (which have infinite length)
@@ -1750,8 +1781,11 @@ export class CuboidShape extends Shape {
                 while (upperHull.length >= 2) {
                     const q = upperHull[upperHull.length - 1];
                     const r = upperHull[upperHull.length - 2];
-                    if ((q.x - r.x) * (p.y - r.y) >= (q.y - r.y) * (p.x - r.x)) upperHull.pop();
-                    else break;
+                    if ((q.x - r.x) * (p.y - r.y) >= (q.y - r.y) * (p.x - r.x)) {
+                        upperHull.pop();
+                    } else {
+                        break;
+                    }
                 }
                 upperHull.push(p);
             }
@@ -1763,8 +1797,11 @@ export class CuboidShape extends Shape {
                 while (lowerHull.length >= 2) {
                     const q = lowerHull[lowerHull.length - 1];
                     const r = lowerHull[lowerHull.length - 2];
-                    if ((q.x - r.x) * (p.y - r.y) >= (q.y - r.y) * (p.x - r.x)) lowerHull.pop();
-                    else break;
+                    if ((q.x - r.x) * (p.y - r.y) >= (q.y - r.y) * (p.x - r.x)) {
+                        lowerHull.pop();
+                    } else {
+                        break;
+                    }
                 }
                 lowerHull.push(p);
             }
@@ -1775,7 +1812,9 @@ export class CuboidShape extends Shape {
                 lowerHull.length === 1 &&
                 upperHull[0].x === lowerHull[0].x &&
                 upperHull[0].y === lowerHull[0].y
-            ) return upperHull;
+            ) {
+                return upperHull;
+            }
             return upperHull.concat(lowerHull);
         }
 
@@ -2120,26 +2159,38 @@ export class SkeletonShape extends Shape {
         const updatedHidden = data.elements.filter((el) => el.updateFlags.hidden);
         const updatedLock = data.elements.filter((el) => el.updateFlags.lock);
 
-        updatedOccluded.forEach((el) => { el.updateFlags.occluded = false; });
-        updatedHidden.forEach((el) => { el.updateFlags.hidden = false; });
-        updatedLock.forEach((el) => { el.updateFlags.lock = false; });
+        updatedOccluded.forEach((el) => {
+            el.updateFlags.occluded = false;
+        });
+        updatedHidden.forEach((el) => {
+            el.updateFlags.hidden = false;
+        });
+        updatedLock.forEach((el) => {
+            el.updateFlags.lock = false;
+        });
 
         if (updatedPoints.length) {
             updateElements(updatedPoints, HistoryActions.CHANGED_POINTS, 'points');
         }
 
         if (updatedOccluded.length) {
-            updatedOccluded.forEach((el) => { el.updateFlags.occluded = true; });
+            updatedOccluded.forEach((el) => {
+                el.updateFlags.occluded = true;
+            });
             updateElements(updatedOccluded, HistoryActions.CHANGED_OCCLUDED, 'occluded');
         }
 
         if (updatedHidden.length) {
-            updatedHidden.forEach((el) => { el.updateFlags.hidden = true; });
+            updatedHidden.forEach((el) => {
+                el.updateFlags.hidden = true;
+            });
             updateElements(updatedHidden, HistoryActions.CHANGED_OUTSIDE, 'hidden');
         }
 
         if (updatedLock.length) {
-            updatedLock.forEach((el) => { el.updateFlags.lock = true; });
+            updatedLock.forEach((el) => {
+                el.updateFlags.lock = true;
+            });
             updateElements(updatedLock, HistoryActions.CHANGED_LOCK, 'lock');
         }
 
@@ -3104,7 +3155,8 @@ export class SkeletonTrack extends Track {
                     for (let i = 0; i < this.elements.length; i++) {
                         if (property) {
                             this.elements[i][property] = undoSkeletonProperties[i];
-                        } if (undoSkeletonShapes[i]) {
+                        }
+                        if (undoSkeletonShapes[i]) {
                             this.elements[i].shapes[frame] = undoSkeletonShapes[i];
                         } else if (redoSkeletonShapes[i]) {
                             delete this.elements[i].shapes[frame];
@@ -3144,28 +3196,44 @@ export class SkeletonTrack extends Track {
         const updatedHidden = data.elements.filter((el) => el.updateFlags.hidden);
         const updatedLock = data.elements.filter((el) => el.updateFlags.lock);
 
-        updatedOccluded.forEach((el) => { el.updateFlags.occluded = false; });
-        updatedOutside.forEach((el) => { el.updateFlags.outside = false; });
-        updatedKeyframe.forEach((el) => { el.updateFlags.keyframe = false; });
-        updatedHidden.forEach((el) => { el.updateFlags.hidden = false; });
-        updatedLock.forEach((el) => { el.updateFlags.lock = false; });
+        updatedOccluded.forEach((el) => {
+            el.updateFlags.occluded = false;
+        });
+        updatedOutside.forEach((el) => {
+            el.updateFlags.outside = false;
+        });
+        updatedKeyframe.forEach((el) => {
+            el.updateFlags.keyframe = false;
+        });
+        updatedHidden.forEach((el) => {
+            el.updateFlags.hidden = false;
+        });
+        updatedLock.forEach((el) => {
+            el.updateFlags.lock = false;
+        });
 
         if (updatedPoints.length) {
             updateElements(updatedPoints, HistoryActions.CHANGED_POINTS);
         }
 
         if (updatedOccluded.length) {
-            updatedOccluded.forEach((el) => { el.updateFlags.occluded = true; });
+            updatedOccluded.forEach((el) => {
+                el.updateFlags.occluded = true;
+            });
             updateElements(updatedOccluded, HistoryActions.CHANGED_OCCLUDED);
         }
 
         if (updatedOutside.length) {
-            updatedOutside.forEach((el) => { el.updateFlags.outside = true; });
+            updatedOutside.forEach((el) => {
+                el.updateFlags.outside = true;
+            });
             updateElements(updatedOutside, HistoryActions.CHANGED_OUTSIDE);
         }
 
         if (updatedKeyframe.length) {
-            updatedKeyframe.forEach((el) => { el.updateFlags.keyframe = true; });
+            updatedKeyframe.forEach((el) => {
+                el.updateFlags.keyframe = true;
+            });
             // todo: fix extra undo/redo change
             this.validateStateBeforeSave(data, data.updateFlags, frame);
             this.saveKeyframe(frame, data.keyframe);
@@ -3174,12 +3242,16 @@ export class SkeletonTrack extends Track {
         }
 
         if (updatedHidden.length) {
-            updatedHidden.forEach((el) => { el.updateFlags.hidden = true; });
+            updatedHidden.forEach((el) => {
+                el.updateFlags.hidden = true;
+            });
             updateElements(updatedHidden, HistoryActions.CHANGED_HIDDEN, 'hidden');
         }
 
         if (updatedLock.length) {
-            updatedLock.forEach((el) => { el.updateFlags.lock = true; });
+            updatedLock.forEach((el) => {
+                el.updateFlags.lock = true;
+            });
             updateElements(updatedLock, HistoryActions.CHANGED_LOCK, 'lock');
         }
 
@@ -3217,7 +3289,7 @@ export class SkeletonTrack extends Track {
 
         throw new DataError(
             'No one left position or right position was found. ' +
-                `Interpolation impossible. Client ID: ${this.clientID}`,
+            `Interpolation impossible. Client ID: ${this.clientID}`,
         );
     }
 }
