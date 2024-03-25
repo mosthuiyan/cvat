@@ -129,7 +129,9 @@ const ReduxAppWrapper = connect(mapStateToProps, mapDispatchToProps)(CVATApplica
 ReactDOM.render(
     <Provider store={cvatStore}>
         <BrowserRouter>
+            {/* 插件，每次重新渲染后都会更新插件的状态 */}
             <PluginsEntrypoint />
+            {/* 整个APP的容器, 使用Redux进行action管理, 使用react-router进行路由管理 */}
             <ReduxAppWrapper />
         </BrowserRouter>
         <LayoutGrid />
